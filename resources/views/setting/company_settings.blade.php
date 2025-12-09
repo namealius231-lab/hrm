@@ -1111,7 +1111,7 @@
                                                 class="col-form-label">{{ __('Pusher App Id') }}</label>
                                             <input class="form-control" placeholder="{{__('Enter Pusher App Id')}}"
                                                 name="pusher_app_id" type="text"
-                                                value="{{ $setting['pusher_app_id'] }}" id="pusher_app_id">
+                                                value="{{ $setting['pusher_app_id'] ?? '' }}" id="pusher_app_id">
 
                                         </div>
                                         <div class="col-lg-6 col-md-6 col-sm-6 form-group">
@@ -1119,7 +1119,7 @@
                                                 class="col-form-label">{{ __('Pusher App Key') }}</label>
                                             <input class="form-control " placeholder="{{__('Enter Pusher App Key')}}"
                                                 name="pusher_app_key" type="text"
-                                                value="{{ $setting['pusher_app_key'] }}" id="pusher_app_key">
+                                                value="{{ $setting['pusher_app_key'] ?? '' }}" id="pusher_app_key">
 
                                         </div>
                                         <div class="col-lg-6 col-md-6 col-sm-6 form-group">
@@ -1127,7 +1127,7 @@
                                                 class="col-form-label">{{ __('Pusher App Secret') }}</label>
                                             <input class="form-control " placeholder="{{__('Enter Pusher App Secret')}}"
                                                 name="pusher_app_secret" type="text"
-                                                value="{{ $setting['pusher_app_secret'] }}" id="pusher_app_secret">
+                                                value="{{ $setting['pusher_app_secret'] ?? '' }}" id="pusher_app_secret">
 
                                         </div>
                                         <div class="col-lg-6 col-md-6 col-sm-6 form-group">
@@ -1135,7 +1135,7 @@
                                                 class="col-form-label">{{ __('Pusher App Cluster') }}</label>
                                             <input class="form-control " placeholder="{{__('Enter Pusher App Cluster')}}"
                                                 name="pusher_app_cluster" type="text"
-                                                value="{{ $setting['pusher_app_cluster'] }}" id="pusher_app_cluster">
+                                                value="{{ $setting['pusher_app_cluster'] ?? '' }}" id="pusher_app_cluster">
 
                                         </div>
                                     </div>
