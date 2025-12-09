@@ -1,0 +1,45 @@
+# Laravel & PHP
+/vendor/
+composer.lock
+.env
+.env.backup
+
+# Node
+/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE & Editor folders
+/.idea/
+/.vscode/
+/project.code-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Laravel caches & logs
+/bootstrap/cache/*
+/storage/*.key
+/storage/logs/*
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+
+# Debug files
+*.log
+
+# PHPUnit
+.phpunit.result.cache
+
+# Optional - if using XAMPP htdocs
+/public/*.map
+/public/hot
+/public/storage
+/public/vendor
+
+# Misc
+.sass-cache
+*.bak
+*.tmp
