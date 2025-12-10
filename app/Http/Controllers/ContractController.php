@@ -30,51 +30,150 @@ class ContractController extends Controller
      */
     public function index()
     {
-        if (\Auth::user()->can('Manage Contract')) {
-            if (\Auth::user()->type == 'company' || \Auth::user()->type == 'hr') {
+        try {
+            if (\Auth::user()->can('Manage Contract')) {
+                $user = \Auth::user();
+                $creatorId = $user->creatorId() ?? $user->id;
+                
+                $contracts = collect([]);
+                $curr_month = collect([]);
+                $curr_week = collect([]);
+                $last_30days = collect([]);
 
-                $contracts   = Contract::where('created_by', '=', \Auth::user()->creatorId())->with(['employee', 'contract_type'])->get();
-                $curr_month  = Contract::where('created_by', '=', \Auth::user()->creatorId())->whereMonth('start_date', '=', date('m'))->get();
-                $curr_week   = Contract::where('created_by', '=', \Auth::user()->creatorId())->whereBetween(
-                    'start_date',
-                    [
-                        \Carbon\Carbon::now()->startOfWeek(),
-                        \Carbon\Carbon::now()->endOfWeek(),
-                    ]
-                )->get();
-                $last_30days = Contract::where('created_by', '=', \Auth::user()->creatorId())->whereDate('start_date', '>', \Carbon\Carbon::now()->subDays(30))->get();
+                if ($user->type == 'company' || $user->type == 'hr' || $user->type == 'super admin') {
+                    try {
+                        $contracts = Contract::where('created_by', '=', $creatorId)
+                            ->with(['employee', 'contract_type'])
+                            ->get();
+                    } catch (\Exception $e) {
+                        \Log::error('Error fetching contracts: ' . $e->getMessage());
+                    }
 
-                // Contracts Summary
-                $cnt_contract                = [];
-                $cnt_contract['total']       = \App\Models\Contract::getContractSummary($contracts);
-                $cnt_contract['this_month']  = \App\Models\Contract::getContractSummary($curr_month);
-                $cnt_contract['this_week']   = \App\Models\Contract::getContractSummary($curr_week);
-                $cnt_contract['last_30days'] = \App\Models\Contract::getContractSummary($last_30days);
+                    try {
+                        $curr_month = Contract::where('created_by', '=', $creatorId)
+                            ->whereMonth('start_date', '=', date('m'))
+                            ->get();
+                    } catch (\Exception $e) {
+                        \Log::error('Error fetching current month contracts: ' . $e->getMessage());
+                    }
+
+                    try {
+                        $curr_week = Contract::where('created_by', '=', $creatorId)
+                            ->whereBetween(
+                                'start_date',
+                                [
+                                    \Carbon\Carbon::now()->startOfWeek(),
+                                    \Carbon\Carbon::now()->endOfWeek(),
+                                ]
+                            )
+                            ->get();
+                    } catch (\Exception $e) {
+                        \Log::error('Error fetching current week contracts: ' . $e->getMessage());
+                    }
+
+                    try {
+                        $last_30days = Contract::where('created_by', '=', $creatorId)
+                            ->whereDate('start_date', '>', \Carbon\Carbon::now()->subDays(30))
+                            ->get();
+                    } catch (\Exception $e) {
+                        \Log::error('Error fetching last 30 days contracts: ' . $e->getMessage());
+                    }
+                } elseif ($user->type == 'employee') {
+                    try {
+                        $contracts = Contract::where('employee_name', '=', $user->id)
+                            ->with(['employee', 'contract_type'])
+                            ->get();
+                    } catch (\Exception $e) {
+                        \Log::error('Error fetching employee contracts: ' . $e->getMessage());
+                    }
+
+                    try {
+                        $curr_month = Contract::where('employee_name', '=', $user->id)
+                            ->whereMonth('start_date', '=', date('m'))
+                            ->get();
+                    } catch (\Exception $e) {
+                        \Log::error('Error fetching employee current month contracts: ' . $e->getMessage());
+                    }
+
+                    try {
+                        $curr_week = Contract::where('employee_name', '=', $user->id)
+                            ->whereBetween(
+                                'start_date',
+                                [
+                                    \Carbon\Carbon::now()->startOfWeek(),
+                                    \Carbon\Carbon::now()->endOfWeek(),
+                                ]
+                            )
+                            ->get();
+                    } catch (\Exception $e) {
+                        \Log::error('Error fetching employee current week contracts: ' . $e->getMessage());
+                    }
+
+                    try {
+                        $last_30days = Contract::where('employee_name', '=', $user->id)
+                            ->whereDate('start_date', '>', \Carbon\Carbon::now()->subDays(30))
+                            ->get();
+                    } catch (\Exception $e) {
+                        \Log::error('Error fetching employee last 30 days contracts: ' . $e->getMessage());
+                    }
+                } else {
+                    // For other user types, show empty contracts
+                    $contracts = collect([]);
+                }
+
+                // Contracts Summary with error handling
+                $cnt_contract = [
+                    'total' => 0,
+                    'this_month' => 0,
+                    'this_week' => 0,
+                    'last_30days' => 0
+                ];
+
+                try {
+                    $cnt_contract['total'] = \App\Models\Contract::getContractSummary($contracts);
+                } catch (\Exception $e) {
+                    \Log::error('Error calculating total contract summary: ' . $e->getMessage());
+                }
+
+                try {
+                    $cnt_contract['this_month'] = \App\Models\Contract::getContractSummary($curr_month);
+                } catch (\Exception $e) {
+                    \Log::error('Error calculating this month contract summary: ' . $e->getMessage());
+                }
+
+                try {
+                    $cnt_contract['this_week'] = \App\Models\Contract::getContractSummary($curr_week);
+                } catch (\Exception $e) {
+                    \Log::error('Error calculating this week contract summary: ' . $e->getMessage());
+                }
+
+                try {
+                    $cnt_contract['last_30days'] = \App\Models\Contract::getContractSummary($last_30days);
+                } catch (\Exception $e) {
+                    \Log::error('Error calculating last 30 days contract summary: ' . $e->getMessage());
+                }
 
                 return view('contracts.index', compact('contracts', 'cnt_contract'));
-            } elseif (\Auth::user()->type == 'employee') {
-                $contracts   = Contract::where('employee_name', '=', \Auth::user()->id)->get();
-                $curr_month  = Contract::where('employee_name', '=', \Auth::user()->id)->whereMonth('start_date', '=', date('m'))->get();
-                $curr_week   = Contract::where('employee_name', '=', \Auth::user()->id)->whereBetween(
-                    'start_date',
-                    [
-                        \Carbon\Carbon::now()->startOfWeek(),
-                        \Carbon\Carbon::now()->endOfWeek(),
-                    ]
-                )->get();
-                $last_30days = Contract::where('created_by', '=', \Auth::user()->creatorId())->whereDate('start_date', '>', \Carbon\Carbon::now()->subDays(30))->get();
-
-                // Contracts Summary
-                $cnt_contract                = [];
-                $cnt_contract['total']       = \App\Models\Contract::getContractSummary($contracts);
-                $cnt_contract['this_month']  = \App\Models\Contract::getContractSummary($curr_month);
-                $cnt_contract['this_week']   = \App\Models\Contract::getContractSummary($curr_week);
-                $cnt_contract['last_30days'] = \App\Models\Contract::getContractSummary($last_30days);
-
-                return view('contracts.index', compact('contracts', 'cnt_contract'));
+            } else {
+                return redirect()->back()->with('error', __('Permission Denied.'));
             }
-        } else {
-            return redirect()->back()->with('error', __('Permission Denied.'));
+        } catch (\Exception $e) {
+            \Log::error('ContractController index error: ' . $e->getMessage(), [
+                'user_id' => \Auth::id(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            // Return view with empty data instead of blank page
+            $contracts = collect([]);
+            $cnt_contract = [
+                'total' => 0,
+                'this_month' => 0,
+                'this_week' => 0,
+                'last_30days' => 0
+            ];
+            
+            return view('contracts.index', compact('contracts', 'cnt_contract'))
+                ->with('error', __('An error occurred loading contracts. Please try again.'));
         }
     }
 

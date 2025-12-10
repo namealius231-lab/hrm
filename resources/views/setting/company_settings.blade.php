@@ -3,41 +3,73 @@
     {{ __('Settings') }}
 @endsection
 @php
-    // $logo = asset(Storage::url('uploads/logo/'));
-    $logo = \App\Models\Utility::get_file('uploads/logo/');
-    $meta_image = \App\Models\Utility::get_file('uploads/meta/');
+    try {
+        // $logo = asset(Storage::url('uploads/logo/'));
+        $logo = \App\Models\Utility::get_file('uploads/logo/');
+        $meta_image = \App\Models\Utility::get_file('uploads/meta/');
 
-    $company_logo = App\Models\Utility::getValByName('company_logo');
-    $company_logo_light = App\Models\Utility::getValByName('company_logo_light');
-    $company_favicon = App\Models\Utility::getValByName('company_favicon');
-    // $SITE_RTL = env('SITE_RTL');
+        $company_logo = App\Models\Utility::getValByName('company_logo');
+        $company_logo_light = App\Models\Utility::getValByName('company_logo_light');
+        $company_favicon = App\Models\Utility::getValByName('company_favicon');
+        // $SITE_RTL = env('SITE_RTL');
 
-    $SITE_RTL = isset($settings['SITE_RTL']) ? $settings['SITE_RTL'] : 'off';
-    if ($SITE_RTL == '') {
+        $SITE_RTL = isset($settings['SITE_RTL']) ? $settings['SITE_RTL'] : 'off';
+        if ($SITE_RTL == '') {
+            $SITE_RTL = 'off';
+        }
+
+        $lang = App\Models\Utility::getValByName('default_language');
+        $color = isset($settings['theme_color']) ? $settings['theme_color'] : 'theme-3';
+        $is_sidebar_transperent = isset($settings['is_sidebar_transperent']) ? $settings['is_sidebar_transperent'] : 'on';
+        $dark_mode = isset($settings['dark_mode']) ? $settings['dark_mode'] : '';
+        
+        try {
+            $currantLang = App\Models\Utility::languages();
+        } catch (\Exception $e) {
+            $currantLang = [];
+        }
+
+        try {
+            $file_type = config('files_types', []);
+        } catch (\Exception $e) {
+            $file_type = [];
+        }
+        
+        $setting = isset($settings) && is_array($settings) ? $settings : [];
+
+        $local_storage_validation = isset($setting['local_storage_validation']) ? $setting['local_storage_validation'] : '';
+        $local_storage_validations = !empty($local_storage_validation) ? explode(',', $local_storage_validation) : [];
+
+        $s3_storage_validation = isset($setting['s3_storage_validation']) ? $setting['s3_storage_validation'] : '';
+        $s3_storage_validations = !empty($s3_storage_validation) ? explode(',', $s3_storage_validation) : [];
+
+        $wasabi_storage_validation = isset($setting['wasabi_storage_validation']) ? $setting['wasabi_storage_validation'] : '';
+        $wasabi_storage_validations = !empty($wasabi_storage_validation) ? explode(',', $wasabi_storage_validation) : [];
+
+        $chatgpt = App\Models\Utility::getValByName('enable_chatgpt');
+
+        $google_recaptcha_version = ['v2-checkbox' => __('v2'), 'v3' => __('v3')];
+    } catch (\Exception $e) {
+        // Set defaults if anything fails
+        $logo = '';
+        $meta_image = '';
+        $company_logo = '';
+        $company_logo_light = '';
+        $company_favicon = '';
         $SITE_RTL = 'off';
+        $lang = 'en';
+        $color = 'theme-3';
+        $is_sidebar_transperent = 'on';
+        $dark_mode = '';
+        $currantLang = [];
+        $file_type = [];
+        $setting = [];
+        $local_storage_validations = [];
+        $s3_storage_validations = [];
+        $wasabi_storage_validations = [];
+        $chatgpt = '';
+        $google_recaptcha_version = ['v2-checkbox' => __('v2'), 'v3' => __('v3')];
     }
-
-    $lang = \App\Models\Utility::getValByName('default_language');
-    $color = isset($settings['theme_color']) ? $settings['theme_color'] : 'theme-3';
-    $is_sidebar_transperent = isset($settings['is_sidebar_transperent']) ? $settings['is_sidebar_transperent'] : 'on';
-    $dark_mode = isset($settings['dark_mode']) ? $settings['dark_mode'] : '';
-    $currantLang = App\Models\Utility::languages();
-
-    $file_type = config('files_types');
-    $setting = App\Models\Utility::settings();
-
-    $local_storage_validation = isset($setting['local_storage_validation']) ? $setting['local_storage_validation'] : '';
-    $local_storage_validations = !empty($local_storage_validation) ? explode(',', $local_storage_validation) : [];
-
-    $s3_storage_validation = isset($setting['s3_storage_validation']) ? $setting['s3_storage_validation'] : '';
-    $s3_storage_validations = !empty($s3_storage_validation) ? explode(',', $s3_storage_validation) : [];
-
-    $wasabi_storage_validation = isset($setting['wasabi_storage_validation']) ? $setting['wasabi_storage_validation'] : '';
-    $wasabi_storage_validations = !empty($wasabi_storage_validation) ? explode(',', $wasabi_storage_validation) : [];
-
-    $chatgpt = App\Models\Utility::getValByName('enable_chatgpt');
-
-    $google_recaptcha_version = ['v2-checkbox' => __('v2'), 'v3' => __('v3')];
 @endphp
 
 @section('breadcrumb')

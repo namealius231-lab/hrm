@@ -412,28 +412,7 @@
             <!-- fianance-->
 
             <!--trainning-->
-            @if (Gate::check('Manage Trainer') || Gate::check('Manage Training'))
-                <li
-                    class="dash-item dash-hasmenu {{ Request::segment(1) == 'training' ? 'dash-trigger active' : '' }}">
-                    <a href="#!" class="dash-link "><span class="dash-micon"><i
-                                class="ti ti-school"></i></span><span
-                            class="dash-mtext">{{ __('Training') }}</span><span class="dash-arrow"><i
-                                data-feather="chevron-right"></i></span></a>
-                    <ul class="dash-submenu">
-                        @can('Manage Training')
-                            <li class="dash-item {{ Request::segment(1) == 'training' ? ' active' : '' }}">
-                                <a class="dash-link" href="{{ route('training.index') }}">{{ __('Training List') }}</a>
-                            </li>
-                        @endcan
-
-                        @can('Manage Trainer')
-                            <li class="dash-item ">
-                                <a class="dash-link" href="{{ route('trainer.index') }}">{{ __('Trainer') }}</a>
-                            </li>
-                        @endcan
-                    </ul>
-                </li>
-            @endif
+            <!-- Training menu removed -->
 
             <!-- tranning-->
 

@@ -107,7 +107,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach ($contracts as $contract)
+                                    @forelse ($contracts as $contract)
                                         <tr>
                                             <td class="Id">
                                                 {{-- @can('View contract') --}}
@@ -117,12 +117,12 @@
                                                 {{-- {{ \Auth::User()->contractNumberFormat($contract->id) }} --}}
                                                 {{-- @endcan --}}
                                             </td>
-                                            <td>{{ $contract->employee->name }}</td>
-                                            <td>{{ $contract->subject }}</td>
-                                            <td>{{ Auth::user()->priceFormat($contract->value) }}</td>
-                                            <td>{{ $contract->contract_type->name }}</td>
-                                            <td>{{ Auth::user()->dateFormat($contract->start_date) }}</td>
-                                            <td>{{ Auth::user()->dateFormat($contract->end_date) }}</td>
+                                            <td>{{ $contract->employee->name ?? __('N/A') }}</td>
+                                            <td>{{ $contract->subject ?? __('N/A') }}</td>
+                                            <td>{{ Auth::user()->priceFormat($contract->value ?? 0) }}</td>
+                                            <td>{{ $contract->contract_type->name ?? __('N/A') }}</td>
+                                            <td>{{ Auth::user()->dateFormat($contract->start_date ?? '') }}</td>
+                                            <td>{{ Auth::user()->dateFormat($contract->end_date ?? '') }}</td>
                                             <td>
                                                 @if ($contract->status == 'accept')
                                                     <span
@@ -193,7 +193,11 @@
                                                 </div>
                                             </td>
                                         </tr>
-                                    @endforeach
+                                    @empty
+                                        <tr>
+                                            <td colspan="9" class="text-center">{{ __('No contracts found.') }}</td>
+                                        </tr>
+                                    @endforelse
                                 </tbody>
                             </table>
                         </div>

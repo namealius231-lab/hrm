@@ -64,14 +64,25 @@ class Contract extends Model
     }
     public static function getContractSummary($contracts)
     {
-        $total = 0;
+        try {
+            $total = 0;
 
-        foreach($contracts as $contract)
-        {
-            $total += $contract->value;
+            if (empty($contracts) || !is_iterable($contracts)) {
+                return \Auth::user()->priceFormat(0);
+            }
+
+            foreach($contracts as $contract)
+            {
+                if (isset($contract->value) && is_numeric($contract->value)) {
+                    $total += $contract->value;
+                }
+            }
+
+            return \Auth::user()->priceFormat($total);
+        } catch (\Exception $e) {
+            \Log::error('getContractSummary error: ' . $e->getMessage());
+            return \Auth::user()->priceFormat(0);
         }
-
-        return \Auth::user()->priceFormat($total);
     }
     public static function status()
     {

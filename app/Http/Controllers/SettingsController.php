@@ -72,45 +72,155 @@ class SettingsController extends Controller
 
         try {
             $user = \Auth::user();
-            $timezones = config('timezones', []);
+            
+            // Initialize all variables with defaults
+            $timezones = [];
+            $settings = [];
+            $EmailTemplates = collect([]);
+            $ips = collect([]);
+            $webhooks = collect([]);
+            $Offerletter = collect([]);
+            $currOfferletterLang = null;
+            $Joiningletter = collect([]);
+            $currjoiningletterLang = null;
+            $experience_certificate = collect([]);
+            $curr_exp_cetificate_Lang = null;
+            $noc_certificate = collect([]);
+            $currnocLang = null;
+            $file_size = 0;
+            
+            try {
+                $timezones = config('timezones', []);
+            } catch (\Exception $e) {
+                \Log::warning('Error loading timezones config: ' . $e->getMessage());
+            }
 
-            $settings = Utility::settings();
-            $EmailTemplates = EmailTemplate::all();
+            try {
+                $settings = Utility::settings();
+                if (!is_array($settings)) {
+                    $settings = [];
+                }
+            } catch (\Exception $e) {
+                \Log::error('Error loading settings: ' . $e->getMessage());
+                $settings = [];
+            }
             
-            $creatorId = \Auth::user()->creatorId() ?? \Auth::user()->id;
-            $userId = \Auth::user()->id;
+            try {
+                $EmailTemplates = EmailTemplate::all();
+            } catch (\Exception $e) {
+                \Log::warning('Error loading email templates: ' . $e->getMessage());
+            }
             
-            $ips = IpRestrict::where('created_by', $creatorId)->get();
-            $webhooks = Webhook::where('created_by', $creatorId)->get();
+            try {
+                $creatorId = \Auth::user()->creatorId() ?? \Auth::user()->id;
+                $userId = \Auth::user()->id;
+            } catch (\Exception $e) {
+                \Log::error('Error getting user IDs: ' . $e->getMessage());
+                $creatorId = \Auth::user()->id ?? 1;
+                $userId = \Auth::user()->id ?? 1;
+            }
+            
+            try {
+                $ips = IpRestrict::where('created_by', $creatorId)->get();
+            } catch (\Exception $e) {
+                \Log::warning('Error loading IP restrictions: ' . $e->getMessage());
+            }
+            
+            try {
+                $webhooks = Webhook::where('created_by', $creatorId)->get();
+            } catch (\Exception $e) {
+                \Log::warning('Error loading webhooks: ' . $e->getMessage());
+            }
+            
             //offer letter
-            $Offerletter = GenerateOfferLetter::all();
-            $currOfferletterLang = GenerateOfferLetter::where('created_by', $userId)->where('lang', $offerlang)->first();
-
+            try {
+                $Offerletter = GenerateOfferLetter::all();
+            } catch (\Exception $e) {
+                \Log::warning('Error loading offer letters: ' . $e->getMessage());
+            }
+            
+            try {
+                $currOfferletterLang = GenerateOfferLetter::where('created_by', $userId)->where('lang', $offerlang)->first();
+            } catch (\Exception $e) {
+                \Log::warning('Error loading current offer letter lang: ' . $e->getMessage());
+            }
 
             //joining letter
-            $Joiningletter = JoiningLetter::all();
-            $currjoiningletterLang = JoiningLetter::where('created_by', $userId)->where('lang', $joininglang)->first();
+            try {
+                $Joiningletter = JoiningLetter::all();
+            } catch (\Exception $e) {
+                \Log::warning('Error loading joining letters: ' . $e->getMessage());
+            }
+            
+            try {
+                $currjoiningletterLang = JoiningLetter::where('created_by', $userId)->where('lang', $joininglang)->first();
+            } catch (\Exception $e) {
+                \Log::warning('Error loading current joining letter lang: ' . $e->getMessage());
+            }
 
             //Experience Certificate
-            $experience_certificate = ExperienceCertificate::all();
-            $curr_exp_cetificate_Lang = ExperienceCertificate::where('created_by', $userId)->where('lang', $explang)->first();
+            try {
+                $experience_certificate = ExperienceCertificate::all();
+            } catch (\Exception $e) {
+                \Log::warning('Error loading experience certificates: ' . $e->getMessage());
+            }
+            
+            try {
+                $curr_exp_cetificate_Lang = ExperienceCertificate::where('created_by', $userId)->where('lang', $explang)->first();
+            } catch (\Exception $e) {
+                \Log::warning('Error loading current experience certificate lang: ' . $e->getMessage());
+            }
 
             //NOC
-            $noc_certificate = NOC::all();
-            $currnocLang = NOC::where('created_by', $userId)->where('lang', $noclang)->first();
-
-            $file_size = 0;
-            if (\File::exists(storage_path('/framework'))) {
-                foreach (\File::allFiles(storage_path('/framework')) as $file) {
-                    $file_size += $file->getSize();
-                }
+            try {
+                $noc_certificate = NOC::all();
+            } catch (\Exception $e) {
+                \Log::warning('Error loading NOC certificates: ' . $e->getMessage());
             }
-            $file_size = number_format($file_size / 1000000, 4);
+            
+            try {
+                $currnocLang = NOC::where('created_by', $userId)->where('lang', $noclang)->first();
+            } catch (\Exception $e) {
+                \Log::warning('Error loading current NOC lang: ' . $e->getMessage());
+            }
+
+            try {
+                if (\File::exists(storage_path('/framework'))) {
+                    foreach (\File::allFiles(storage_path('/framework')) as $file) {
+                        $file_size += $file->getSize();
+                    }
+                }
+                $file_size = number_format($file_size / 1000000, 4);
+            } catch (\Exception $e) {
+                \Log::warning('Error calculating file size: ' . $e->getMessage());
+                $file_size = 0;
+            }
 
             return view('setting.company_settings', compact('settings', 'timezones', 'ips', 'EmailTemplates', 'currOfferletterLang', 'Offerletter', 'offerlang', 'Joiningletter', 'currjoiningletterLang', 'joininglang', 'experience_certificate', 'curr_exp_cetificate_Lang', 'explang', 'noc_certificate', 'currnocLang', 'noclang', 'file_size', 'webhooks', 'offerlangName', 'joininglangName', 'explangName', 'noclangName'));
         } catch (\Exception $e) {
-            \Log::error('Settings index error: ' . $e->getMessage());
-            return redirect()->back()->with('error', __('An error occurred: ') . $e->getMessage());
+            \Log::error('Settings index fatal error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'user_id' => \Auth::id()
+            ]);
+            
+            // Return view with empty data instead of crashing
+            $settings = [];
+            $timezones = [];
+            $ips = collect([]);
+            $webhooks = collect([]);
+            $EmailTemplates = collect([]);
+            $Offerletter = collect([]);
+            $currOfferletterLang = null;
+            $Joiningletter = collect([]);
+            $currjoiningletterLang = null;
+            $experience_certificate = collect([]);
+            $curr_exp_cetificate_Lang = null;
+            $noc_certificate = collect([]);
+            $currnocLang = null;
+            $file_size = 0;
+            
+            return view('setting.company_settings', compact('settings', 'timezones', 'ips', 'EmailTemplates', 'currOfferletterLang', 'Offerletter', 'offerlang', 'Joiningletter', 'currjoiningletterLang', 'joininglang', 'experience_certificate', 'curr_exp_cetificate_Lang', 'explang', 'noc_certificate', 'currnocLang', 'noclang', 'file_size', 'webhooks', 'offerlangName', 'joininglangName', 'explangName', 'noclangName'))
+                ->with('error', __('An error occurred loading settings. Please refresh the page.'));
         }
     }
 
