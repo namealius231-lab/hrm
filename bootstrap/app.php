@@ -71,5 +71,30 @@ return Application::configure(basePath: dirname(__DIR__))
         );
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // Handle exceptions gracefully in production
+        $exceptions->render(function (Throwable $e, $request) {
+            // Log the error
+            \Log::error('Unhandled exception: ' . $e->getMessage(), [
+                'exception' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'url' => $request->fullUrl(),
+                'method' => $request->method(),
+            ]);
+
+            // In production, show user-friendly error
+            if (!config('app.debug') && app()->environment('production')) {
+                if ($request->expectsJson()) {
+                    return response()->json([
+                        'message' => 'An error occurred. Please try again later.',
+                        'error' => 'Server Error'
+                    ], 500);
+                }
+                
+                // Redirect dashboard errors to login
+                if ($request->is('dashboard') || $request->is('home')) {
+                    return redirect('login')->with('error', __('An error occurred loading the page. Please try again.'));
+                }
+            }
+        });
     })->create();

@@ -44,7 +44,33 @@ class Handler extends ExceptionHandler
     public function register()
     {
         $this->reportable(function (Throwable $e) {
-            //
+            // Log all exceptions with context
+            if (config('app.debug')) {
+                \Log::error('Exception: ' . $e->getMessage(), [
+                    'exception' => get_class($e),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+            }
+        });
+
+        // Handle 500 errors gracefully
+        $this->renderable(function (Throwable $e, $request) {
+            // Don't show detailed errors in production
+            if (!config('app.debug') && app()->environment('production')) {
+                if ($request->expectsJson()) {
+                    return response()->json([
+                        'message' => 'An error occurred. Please try again later.',
+                        'error' => 'Server Error'
+                    ], 500);
+                }
+                
+                // For web requests, redirect to a safe page
+                if ($request->is('dashboard') || $request->is('home')) {
+                    return redirect('login')->with('error', __('An error occurred. Please try again.'));
+                }
+            }
         });
     }
 }

@@ -217,12 +217,19 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request)
     {
+        try {
+            // Logout the user
+            Auth::guard('web')->logout();
 
-        Auth::guard('web')->logout();
-
-        $request->session()->invalidate();
-
-        $request->session()->regenerateToken();
+            // Invalidate and regenerate session
+            if ($request->hasSession()) {
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+            }
+        } catch (\Exception $e) {
+            // If session is already expired or invalid, just logout
+            Auth::guard('web')->logout();
+        }
 
         return redirect('/');
     }

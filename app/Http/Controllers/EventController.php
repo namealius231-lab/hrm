@@ -310,34 +310,63 @@ class EventController extends Controller
 
     public function get_event_data(Request $request)
     {
-        $arrayJson = [];
-        if($request->get('calender_type') == 'google_calender')
-        {
-            $type ='event';
-            $arrayJson =  Utility::getCalendarData($type);
-        }
-        else
-        {
-            $data =LocalEvent::get();
+        try {
+            $arrayJson = [];
             
-            foreach($data as $val)
+            if($request->get('calender_type') == 'google_calender')
             {
-                $end_date=date_create($val->end_date);
-                date_add($end_date,date_interval_create_from_date_string("1 days"));
-                $arrayJson[] = [
-                    "id"=> $val->id,
-                    "title" => $val->title,
-                    "start" => $val->start_date,
-                    "end" => date_format($end_date,"Y-m-d H:i:s"),
-                    "className" => $val->color,
-                    "allDay" => true,
-                    "url"=> route('event.edit', $val['id']),
-
-                ];
+                try {
+                    $type = 'event';
+                    $arrayJson = Utility::getCalendarData($type);
+                    if (!is_array($arrayJson)) {
+                        $arrayJson = [];
+                    }
+                } catch (\Exception $e) {
+                    \Log::error('Error fetching Google Calendar data: ' . $e->getMessage());
+                    $arrayJson = [];
+                }
             }
+            else
+            {
+                try {
+                    $data = LocalEvent::get();
+                    
+                    foreach($data as $val)
+                    {
+                        try {
+                            if (empty($val->end_date) || empty($val->start_date)) {
+                                continue; // Skip invalid events
+                            }
+                            
+                            $end_date = date_create($val->end_date);
+                            if ($end_date) {
+                                date_add($end_date, date_interval_create_from_date_string("1 days"));
+                                $arrayJson[] = [
+                                    "id" => $val->id ?? null,
+                                    "title" => $val->title ?? '',
+                                    "start" => $val->start_date ?? date('Y-m-d'),
+                                    "end" => date_format($end_date, "Y-m-d H:i:s"),
+                                    "className" => $val->color ?? 'event-primary',
+                                    "allDay" => true,
+                                    "url" => route('event.edit', $val['id'] ?? 0),
+                                ];
+                            }
+                        } catch (\Exception $e) {
+                            \Log::warning('Error processing event ID ' . ($val->id ?? 'unknown') . ': ' . $e->getMessage());
+                            continue; // Skip this event and continue with others
+                        }
+                    }
+                } catch (\Exception $e) {
+                    \Log::error('Error fetching local events: ' . $e->getMessage());
+                    $arrayJson = [];
+                }
+            }
+            
+            return response()->json($arrayJson);
+        } catch (\Exception $e) {
+            \Log::error('get_event_data fatal error: ' . $e->getMessage());
+            return response()->json([]);
         }
-        
-        return $arrayJson;
     }
 
 }

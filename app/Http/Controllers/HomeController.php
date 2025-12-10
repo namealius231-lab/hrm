@@ -35,123 +35,268 @@ class HomeController extends Controller
      */
     public function index()
     {
-        if(Auth::check())
-        {
-            $user = Auth::user();
-            if($user->type == 'employee')
+        try {
+            if(Auth::check())
             {
-
-                $emp = Employee::where('user_id', '=', $user->id)->first();
-
-                $announcements = Announcement::orderBy('announcements.id', 'desc')->take(5)->leftjoin('announcement_employees', 'announcements.id', '=', 'announcement_employees.announcement_id')->where('announcement_employees.employee_id', '=', $emp->id)->orWhere(
-                    function ($q){
-                        $q->where('announcements.department_id', '["0"]')->where('announcements.employee_id', '["0"]');
-                    }
-                )->get();
-
-                $employees = Employee::get();
-                $meetings  = Meeting::orderBy('meetings.id', 'desc')->take(5)->leftjoin('meeting_employees', 'meetings.id', '=', 'meeting_employees.meeting_id')->where('meeting_employees.employee_id', '=', $emp->id)->orWhere(
-                    function ($q){
-                        $q->where('meetings.department_id', '["0"]')->where('meetings.employee_id', '["0"]'); 
-                    }
-                )->get();
-
-                $events    = Event::select('events.*','events.id as event_id_pk','event_employees.*')
-                ->leftjoin('event_employees', 'events.id', '=', 'event_employees.event_id')
-                ->where('event_employees.employee_id', '=', $emp->id)
-                ->orWhere(
-                    function ($q){
-                        $q->where('events.department_id', '["0"]')->where('events.employee_id', '["0"]');
-                    }
-                )->get();
+                $user = Auth::user();
                 
-                $arrEvents = [];
-                foreach($events as $event)
+                if($user->type == 'employee')
                 {
+                    try {
+                        $emp = Employee::where('user_id', '=', $user->id)->first();
+                        
+                        if (!$emp) {
+                            \Log::warning('Employee not found for user: ' . $user->id);
+                            return redirect('login')->with('error', __('Employee profile not found.'));
+                        }
 
-                    $arr['id']              = $event['id'];
-                    $arr['title']           = $event['title'];
-                    $arr['start']           = $event['start_date'];
-                    $arr['end']             = $event['end_date'];
-                    $arr['className']       = $event['color'];
-                    // $arr['borderColor']     = "#fff";
-                    $arr['url']             = route('eventsshow', (!empty($event['event_id_pk'])) ? $event['event_id_pk'] : '' );
-                    // $arr['textColor']       = "white";
+                        $announcements = [];
+                        $meetings = [];
+                        $arrEvents = [];
+                        $employees = collect([]);
+                        $employeeAttendance = null;
+                        $officeTime = ['startTime' => '09:00', 'endTime' => '18:00'];
 
-                    $arrEvents[] = $arr;
+                        try {
+                            $announcements = Announcement::orderBy('announcements.id', 'desc')
+                                ->take(5)
+                                ->leftjoin('announcement_employees', 'announcements.id', '=', 'announcement_employees.announcement_id')
+                                ->where('announcement_employees.employee_id', '=', $emp->id)
+                                ->orWhere(function ($q){
+                                    $q->where('announcements.department_id', '["0"]')
+                                      ->where('announcements.employee_id', '["0"]');
+                                })
+                                ->get();
+                        } catch (\Exception $e) {
+                            \Log::error('Error fetching announcements: ' . $e->getMessage());
+                        }
+
+                        try {
+                            $employees = Employee::get();
+                        } catch (\Exception $e) {
+                            \Log::error('Error fetching employees: ' . $e->getMessage());
+                        }
+
+                        try {
+                            $meetings = Meeting::orderBy('meetings.id', 'desc')
+                                ->take(5)
+                                ->leftjoin('meeting_employees', 'meetings.id', '=', 'meeting_employees.meeting_id')
+                                ->where('meeting_employees.employee_id', '=', $emp->id)
+                                ->orWhere(function ($q){
+                                    $q->where('meetings.department_id', '["0"]')
+                                      ->where('meetings.employee_id', '["0"]'); 
+                                })
+                                ->get();
+                        } catch (\Exception $e) {
+                            \Log::error('Error fetching meetings: ' . $e->getMessage());
+                        }
+
+                        try {
+                            $events = Event::select('events.*','events.id as event_id_pk','event_employees.*')
+                                ->leftjoin('event_employees', 'events.id', '=', 'event_employees.event_id')
+                                ->where('event_employees.employee_id', '=', $emp->id)
+                                ->orWhere(function ($q){
+                                    $q->where('events.department_id', '["0"]')
+                                      ->where('events.employee_id', '["0"]');
+                                })
+                                ->get();
+                            
+                            foreach($events as $event)
+                            {
+                                $arr['id']        = $event['id'] ?? null;
+                                $arr['title']     = $event['title'] ?? '';
+                                $arr['start']     = $event['start_date'] ?? date('Y-m-d');
+                                $arr['end']       = $event['end_date'] ?? date('Y-m-d');
+                                $arr['className'] = $event['color'] ?? 'event-primary';
+                                $arr['url']       = route('eventsshow', (!empty($event['event_id_pk'])) ? $event['event_id_pk'] : '' );
+                                $arrEvents[] = $arr;
+                            }
+                        } catch (\Exception $e) {
+                            \Log::error('Error fetching events: ' . $e->getMessage());
+                        }
+
+                        try {
+                            $date = date("Y-m-d");
+                            $employeeId = !empty(\Auth::user()->employee) ? \Auth::user()->employee->id : 0;
+                            $employeeAttendance = AttendanceEmployee::orderBy('id', 'desc')
+                                ->where('employee_id', '=', $employeeId)
+                                ->where('date', '=', $date)
+                                ->first();
+                        } catch (\Exception $e) {
+                            \Log::error('Error fetching attendance: ' . $e->getMessage());
+                        }
+
+                        try {
+                            $officeTime['startTime'] = Utility::getValByName('company_start_time') ?? '09:00';
+                            $officeTime['endTime']   = Utility::getValByName('company_end_time') ?? '18:00';
+                        } catch (\Exception $e) {
+                            \Log::error('Error fetching office time: ' . $e->getMessage());
+                        }
+
+                        return view('dashboard.dashboard', compact('arrEvents', 'announcements', 'employees', 'meetings', 'employeeAttendance', 'officeTime'));
+                    } catch (\Exception $e) {
+                        \Log::error('Dashboard error (employee): ' . $e->getMessage(), [
+                            'user_id' => $user->id,
+                            'trace' => $e->getTraceAsString()
+                        ]);
+                        return redirect('login')->with('error', __('An error occurred loading the dashboard.'));
+                    }
                 }
+                else
+                {
+                    try {
+                        $creatorId = \Auth::user()->creatorId() ?? \Auth::user()->id;
+                        
+                        $events = [];
+                        $arrEvents = [];
+                        $announcements = collect([]);
+                        $emp = collect([]);
+                        $user = collect([]);
+                        $countEmployee = 0;
+                        $countUser = 0;
+                        $countTicket = 0;
+                        $countOpenTicket = 0;
+                        $countCloseTicket = 0;
+                        $notClockIns = collect([]);
+                        $accountBalance = 0;
+                        $activeJob = 0;
+                        $inActiveJOb = 0;
+                        $totalPayee = 0;
+                        $totalPayer = 0;
+                        $meetings = collect([]);
 
-                $date               = date("Y-m-d");
-                $time               = date("H:i:s");
-                $employeeAttendance = AttendanceEmployee::orderBy('id', 'desc')->where('employee_id', '=', !empty(\Auth::user()->employee) ? \Auth::user()->employee->id : 0)->where('date', '=', $date)->first();
+                        try {
+                            $events = Event::where('created_by', '=', $creatorId)->get();
+                            foreach($events as $event)
+                            {
+                                $arr['id']        = $event['id'] ?? null;
+                                $arr['title']     = $event['title'] ?? '';
+                                $arr['start']     = $event['start_date'] ?? date('Y-m-d');
+                                $arr['end']       = $event['end_date'] ?? date('Y-m-d');
+                                $arr['className'] = $event['color'] ?? 'event-primary';
+                                $arr['url']       = route('event.edit', $event['id']);
+                                $arrEvents[] = $arr;
+                            }
+                        } catch (\Exception $e) {
+                            \Log::error('Error fetching events: ' . $e->getMessage());
+                        }
 
-                $officeTime['startTime'] = Utility::getValByName('company_start_time');
-                $officeTime['endTime']   = Utility::getValByName('company_end_time');
+                        try {
+                            $announcements = Announcement::orderBy('announcements.id', 'desc')
+                                ->take(5)
+                                ->where('created_by', '=', $creatorId)
+                                ->get();
+                        } catch (\Exception $e) {
+                            \Log::error('Error fetching announcements: ' . $e->getMessage());
+                        }
 
-                return view('dashboard.dashboard', compact('arrEvents', 'announcements', 'employees', 'meetings', 'employeeAttendance', 'officeTime'));
+                        try {
+                            $emp = User::where('type', '=', 'employee')
+                                ->where('created_by', '=', $creatorId)
+                                ->get();
+                            $countEmployee = count($emp);
+                        } catch (\Exception $e) {
+                            \Log::error('Error fetching employees: ' . $e->getMessage());
+                        }
+
+                        try {
+                            $user = User::where('type', '!=', 'employee')
+                                ->where('created_by', '=', $creatorId)
+                                ->get();
+                            $countUser = count($user);
+                        } catch (\Exception $e) {
+                            \Log::error('Error fetching users: ' . $e->getMessage());
+                        }
+
+                        try {
+                            $countTicket = Ticket::where('created_by', '=', $creatorId)->count();
+                            $countOpenTicket = Ticket::where('status', '=', 'open')
+                                ->where('created_by', '=', $creatorId)
+                                ->count();
+                            $countCloseTicket = Ticket::where('status', '=', 'close')
+                                ->where('created_by', '=', $creatorId)
+                                ->count();
+                        } catch (\Exception $e) {
+                            \Log::error('Error fetching tickets: ' . $e->getMessage());
+                        }
+
+                        try {
+                            $currentDate = date('Y-m-d');
+                            $notClockIn = AttendanceEmployee::where('date', '=', $currentDate)
+                                ->get()
+                                ->pluck('employee_id');
+                            $notClockIns = Employee::where('created_by', '=', $creatorId)
+                                ->whereNotIn('id', $notClockIn)
+                                ->get();
+                        } catch (\Exception $e) {
+                            \Log::error('Error fetching clock-ins: ' . $e->getMessage());
+                        }
+
+                        try {
+                            $accountBalance = AccountList::where('created_by', '=', $creatorId)
+                                ->sum('initial_balance') ?? 0;
+                        } catch (\Exception $e) {
+                            \Log::error('Error fetching account balance: ' . $e->getMessage());
+                        }
+                        
+                        try {
+                            $activeJob = Job::where('status', 'active')
+                                ->where('created_by', '=', $creatorId)
+                                ->count();
+                            $inActiveJOb = Job::where('status', 'in_active')
+                                ->where('created_by', '=', $creatorId)
+                                ->count();
+                        } catch (\Exception $e) {
+                            \Log::error('Error fetching jobs: ' . $e->getMessage());
+                        }
+
+                        try {
+                            $totalPayee = Payees::where('created_by', '=', $creatorId)->count();
+                            $totalPayer = Payer::where('created_by', '=', $creatorId)->count();
+                        } catch (\Exception $e) {
+                            \Log::error('Error fetching payees/payers: ' . $e->getMessage());
+                        }
+
+                        try {
+                            $meetings = Meeting::where('created_by', '=', $creatorId)
+                                ->limit(5)
+                                ->get();
+                        } catch (\Exception $e) {
+                            \Log::error('Error fetching meetings: ' . $e->getMessage());
+                        }
+
+                        return view('dashboard.dashboard', compact('arrEvents', 'announcements', 'activeJob','inActiveJOb','meetings', 'countEmployee', 'countUser', 'countTicket', 'countOpenTicket', 'countCloseTicket', 'notClockIns', 'countEmployee', 'accountBalance', 'totalPayee', 'totalPayer'));
+                    } catch (\Exception $e) {
+                        \Log::error('Dashboard error (company/admin): ' . $e->getMessage(), [
+                            'user_id' => $user->id,
+                            'trace' => $e->getTraceAsString()
+                        ]);
+                        return redirect('login')->with('error', __('An error occurred loading the dashboard.'));
+                    }
+                }
             }
             else
             {
-                $events    = Event::where('created_by', '=', \Auth::user()->creatorId())->get();
-                $arrEvents = [];
-
-                foreach($events as $event)
+                if(!file_exists(storage_path() . "/installed"))
                 {
-                    $arr['id']    = $event['id'];
-                    $arr['title'] = $event['title'];
-                    $arr['start'] = $event['start_date'];
-                    $arr['end']   = $event['end_date'];
-
-                    $arr['className'] = $event['color'];
-                    // $arr['borderColor']     = "#fff";
-                    // $arr['textColor']       = "white";
-                    $arr['url']             = route('event.edit', $event['id']);
-
-                    $arrEvents[] = $arr;
+                    header('location:install');
+                    die;
                 }
-
-                $announcements = Announcement::orderBy('announcements.id', 'desc')->take(5)->where('created_by', '=', \Auth::user()->creatorId())->get();
-
-                $emp           = User::where('type', '=', 'employee')->where('created_by', '=', \Auth::user()->creatorId())->get();
-                $countEmployee = count($emp);
-
-                $user      = User::where('type', '!=', 'employee')->where('created_by', '=', \Auth::user()->creatorId())->get();
-                $countUser = count($user);
-
-                $countTicket      = Ticket::where('created_by', '=', \Auth::user()->creatorId())->count();
-                $countOpenTicket  = Ticket::where('status', '=', 'open')->where('created_by', '=', \Auth::user()->creatorId())->count();
-                $countCloseTicket = Ticket::where('status', '=', 'close')->where('created_by', '=', \Auth::user()->creatorId())->count();
-
-                $currentDate = date('Y-m-d');
-
-                $countEmployee = count($emp);
-                $notClockIn    = AttendanceEmployee::where('date', '=', $currentDate)->get()->pluck('employee_id');
-
-                $notClockIns    = Employee::where('created_by', '=', \Auth::user()->creatorId())->whereNotIn('id', $notClockIn)->get();
-                $accountBalance = AccountList::where('created_by', '=', \Auth::user()->creatorId())->sum('initial_balance');
-                
-                $activeJob   = Job::where('status', 'active')->where('created_by', '=', \Auth::user()->creatorId())->count();
-                $inActiveJOb = Job::where('status', 'in_active')->where('created_by', '=', \Auth::user()->creatorId())->count();
-
-                $totalPayee = Payees::where('created_by', '=', \Auth::user()->creatorId())->count();
-                $totalPayer = Payer::where('created_by', '=', \Auth::user()->creatorId())->count();
-
-                $meetings = Meeting::where('created_by', '=', \Auth::user()->creatorId())->limit(5)->get();
-
-                return view('dashboard.dashboard', compact('arrEvents', 'announcements', 'activeJob','inActiveJOb','meetings', 'countEmployee', 'countUser', 'countTicket', 'countOpenTicket', 'countCloseTicket', 'notClockIns', 'countEmployee', 'accountBalance', 'totalPayee', 'totalPayer'));
+                else
+                {
+                    return redirect('login');
+                }
             }
-        }
-        else
-        {
-            if(!file_exists(storage_path() . "/installed"))
-            {
-                header('location:install');
-                die;
+        } catch (\Exception $e) {
+            \Log::error('Dashboard fatal error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            if (Auth::check()) {
+                return redirect('login')->with('error', __('An error occurred. Please try again.'));
             }
-            else
-            {
-                return redirect('login');
-            }
+            
+            return redirect('login');
         }
     }
 

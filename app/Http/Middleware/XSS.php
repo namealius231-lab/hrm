@@ -23,43 +23,59 @@ class XSS
      */
     public function handle($request, Closure $next)
     {
-        if (\Auth::check()) {
+        try {
+            if (\Auth::check()) {
+                try {
+                    $settings = Utility::settings();
+                    if (!empty($settings['timezone'])) {
+                        Config::set('app.timezone', $settings['timezone']);
+                        date_default_timezone_set(Config::get('app.timezone', 'UTC'));
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('XSS middleware: Error loading settings: ' . $e->getMessage());
+                }
 
-            $settings = Utility::settings();
-            if (!empty($settings['timezone'])) {
-                Config::set('app.timezone', $settings['timezone']);
-                date_default_timezone_set(Config::get('app.timezone', 'UTC'));
-            }
+                try {
+                    $user = \Auth::user();
+                    if ($user && isset($user->lang)) {
+                        \App::setLocale($user->lang);
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('XSS middleware: Error setting locale: ' . $e->getMessage());
+                }
 
-            \App::setLocale(\Auth::user()->lang);
+                if (\Auth::user()->type == 'company') {
+                    try {
+                        if (Schema::hasTable('ch_messages')) {
+                            if (Schema::hasColumn('ch_messages', 'type') == false) {
+                                Schema::drop('ch_messages');
+                                \DB::table('migrations')->where('migration', 'like', '%ch_messages%')->delete();
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        \Log::warning('XSS middleware: Error checking ch_messages table: ' . $e->getMessage());
+                    }
 
-            if (\Auth::user()->type == 'company') {
-                if (Schema::hasTable('ch_messages')) {
+                    try {
+                        $migrations = $this->getMigrations();
+                        $messengerMigration = Utility::get_messenger_packages_migration();
+                        $dbMigrations = $this->getExecutedMigrations();
+                        $Modulemigrations = glob(base_path() . '/Modules/LandingPage/Database' . DIRECTORY_SEPARATOR . 'Migrations' . DIRECTORY_SEPARATOR . '*.php');
+                        $numberOfUpdatesPending = (count($migrations) + count($Modulemigrations) + $messengerMigration) - count($dbMigrations);
 
-                    if (Schema::hasColumn('ch_messages', 'type') == false) {
-
-                        Schema::drop('ch_messages');
-                        \DB::table('migrations')->where('migration', 'like', '%ch_messages%')->delete();
+                        if ($numberOfUpdatesPending > 0) {
+                            Utility::addNewData();
+                            return redirect()->route('LaravelUpdater::welcome');
+                        }
+                    } catch (\Exception $e) {
+                        \Log::warning('XSS middleware: Error checking migrations: ' . $e->getMessage());
+                        // Continue with request even if migration check fails
                     }
                 }
-
-                // $migrations = $this->getMigrations();
-                // $dbMigrations           = $this->getExecutedMigrations();
-                // // $numberOfUpdatesPending = (count($migrations) + 6) - count($dbMigrations);
-                // $numberOfUpdatesPending = (count($migrations)) - count($dbMigrations);
-
-                $migrations             = $this->getMigrations();
-                $messengerMigration     = Utility::get_messenger_packages_migration();
-                $dbMigrations           = $this->getExecutedMigrations();
-                $Modulemigrations = glob(base_path() . '/Modules/LandingPage/Database' . DIRECTORY_SEPARATOR . 'Migrations' . DIRECTORY_SEPARATOR . '*.php');
-                $numberOfUpdatesPending = (count($migrations) + count($Modulemigrations) + $messengerMigration) - count($dbMigrations);
-
-                if ($numberOfUpdatesPending > 0) {
-                    // run code like seeder only when new migration
-                    Utility::addNewData();
-                    return redirect()->route('LaravelUpdater::welcome');
-                }
             }
+        } catch (\Exception $e) {
+            \Log::error('XSS middleware fatal error: ' . $e->getMessage());
+            // Don't break the request, continue
         }
 
         return $next($request);

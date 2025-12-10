@@ -2499,11 +2499,15 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function creatorId()
     {
-
-        if ($this->type == 'company' || $this->type == 'super admin') {
-            return $this->id;
-        } else {
-            return $this->created_by;
+        try {
+            if ($this->type == 'company' || $this->type == 'super admin') {
+                return $this->id ?? 1;
+            } else {
+                return $this->created_by ?? $this->id ?? 1;
+            }
+        } catch (\Exception $e) {
+            \Log::error('User::creatorId error: ' . $e->getMessage());
+            return $this->id ?? 1;
         }
     }
 

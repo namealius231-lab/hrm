@@ -31,14 +31,25 @@ class Utility extends Model
 
     public static function fetchSettings()
     {
-        $data = DB::table('settings');
-        if (\Auth::check()) {
-            $userId = \Auth::user()->creatorId();
-            $data   = $data->where('created_by', '=', $userId);
-        } else {
-            $data = $data->where('created_by', '=', 1);
+        try {
+            $data = DB::table('settings');
+            if (\Auth::check()) {
+                try {
+                    $userId = \Auth::user()->creatorId() ?? 1;
+                    $data   = $data->where('created_by', '=', $userId);
+                } catch (\Exception $e) {
+                    \Log::warning('Utility::fetchSettings: Error getting creatorId: ' . $e->getMessage());
+                    $data = $data->where('created_by', '=', 1);
+                }
+            } else {
+                $data = $data->where('created_by', '=', 1);
+            }
+            $data = $data->get();
+        } catch (\Exception $e) {
+            \Log::error('Utility::fetchSettings: Database error: ' . $e->getMessage());
+            // Return empty collection if database query fails
+            $data = collect([]);
         }
-        $data = $data->get();
 
         $settings = [
             "site_currency" => "Dollars",
@@ -210,11 +221,16 @@ class Utility extends Model
 
     public static function getValByName($key)
     {
-        $setting = Utility::settings();
-        if (!isset($setting[$key]) || empty($setting[$key])) {
-            $setting[$key] = '';
+        try {
+            $setting = Utility::settings();
+            if (!isset($setting[$key]) || empty($setting[$key])) {
+                return '';
+            }
+            return $setting[$key];
+        } catch (\Exception $e) {
+            \Log::warning('Utility::getValByName error for key "' . $key . '": ' . $e->getMessage());
+            return '';
         }
-        return $setting[$key];
     }
 
     public static function setEnvironmentValue(array $values)
